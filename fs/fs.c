@@ -44,6 +44,12 @@
 #include <sys/time.h>
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
+
+struct state{
+    char *rootdir;
+};
+#define DATA ((struct state *) fuse_get_context()->private_data)
+
 #endif
 
 static int xmp_getattr(const char *path, struct stat *stbuf)
@@ -411,5 +417,7 @@ static struct fuse_operations xmp_oper = {
 int main(int argc, char *argv[])
 {
 	umask(0);
-	return fuse_main(argc, argv, &xmp_oper, NULL);
+	data = malloc(sizeof(struct state));
+	data->rootdir=
+	return fuse_main(argc, argv, &xmp_oper, );
 }
