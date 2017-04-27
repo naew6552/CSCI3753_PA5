@@ -35,6 +35,7 @@
 #endif
 
 #include <limits.h>
+#include <stdlib.h>
 #include <fuse.h>
 #include <stdio.h>
 #include <string.h>
@@ -49,13 +50,13 @@
 struct enc_state{
     char *rootdir;
 };
-#define ENC_DATA ((struct state *) fuse_get_context()->private_data)
+#define ENC_DATA ((struct enc_state *) fuse_get_context()->private_data)
 
 #endif
 
 static void enc_realpath(char full[PATH_MAX], const char *path)
 {
-	strcpy(full, DATA->rootdir);
+	strcpy(full, ENC_DATA->rootdir);
 	strncat(full, path, PATH_MAX);
 }
 
@@ -204,7 +205,8 @@ static int xmp_symlink(const char *from, const char *to)
 static int xmp_rename(const char *from, const char *to)
 {
 	int res;
-	char rfrom[PATH_MAX],char rto[PATH_MAX];
+	char rfrom[PATH_MAX];
+	char rto[PATH_MAX];
 	enc_realpath(rfrom, from);
 	enc_realpath(rto, to);
 
@@ -218,7 +220,8 @@ static int xmp_rename(const char *from, const char *to)
 static int xmp_link(const char *from, const char *to)
 {
 	int res;
-	char rfrom[PATH_MAX],char rto[PATH_MAX];
+	char rfrom[PATH_MAX];
+	char rto[PATH_MAX];
 	enc_realpath(rfrom, from);
 	enc_realpath(rto, to);
 
@@ -474,8 +477,10 @@ static struct fuse_operations xmp_oper = {
 int main(int argc, char *argv[])
 {
 	umask(0);
-	enc_data = malloc(sizeof(struct state));
+	struct enc_state *enc_data;
+	enc_data = malloc(sizeof(struct enc_state));
 	enc_data->rootdir=argv[argc-1];
 	argv[argc-1] = NULL;
-	return fuse_main(argc, argv, &xmp_oper, data);
+	argc--;
+	return fuse_main(argc, argv, &xmp_oper, enc_data);
 }
