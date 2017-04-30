@@ -34,6 +34,8 @@
 #define _XOPEN_SOURCE 500
 #endif
 
+#include "aes-crypt.h"
+
 #include <limits.h>
 #include <stdlib.h>
 #include <fuse.h>
@@ -49,6 +51,7 @@
 
 struct enc_state{
     char *rootdir;
+    char *passcode;
 };
 #define ENC_DATA ((struct enc_state *) fuse_get_context()->private_data)
 
@@ -296,11 +299,14 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 	char rpath[PATH_MAX];
 	enc_realpath(rpath, path);
 
+	do_crypt(rpath, rpath, 0, ENC_DATA->passcode); 
 	res = open(rpath, fi->flags);
 	if (res == -1)
+		do_crypt(rpath, rpath, 1, ENC_DATA->passcode);
 		return -errno;
 
 	close(res);
+	do_crypt(rpath, rpath, 1, ENC_DATA->passcode);
 	return 0;
 }
 
@@ -311,15 +317,20 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 	int res;
 
 	(void) fi;
-	fd = open(path, O_RDONLY);
+	char rpath[PATH_MAX];
+	enc_realpath(rpath, path);
+	do_crypt(rpath, rpath, 0, ENC_DATA->passcode);
+	fd = open(rpath, O_RDONLY);
 	if (fd == -1)
+		do_crypt(rpath, rpath, 1, ENC_DATA->passcode);
 		return -errno;
 
 	res = pread(fd, buf, size, offset);
-	if (res == -1)
+	if (res == -1)	
 		res = -errno;
 
 	close(fd);
+	do_crypt(rpath, rpath, 1, ENC_DATA->passcode);
 	return res;
 }
 
@@ -330,8 +341,12 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 	int res;
 
 	(void) fi;
-	fd = open(path, O_WRONLY);
+	char rpath[PATH_MAX];
+	enc_realpath(rpath, path);
+	do_crypt(rpath, rpath, 0, ENC_DATA->passcode);
+	fd = open(rpath, O_WRONLY);
 	if (fd == -1)
+		do_crypt(rpath, rpath, 1, ENC_DATA->passcode);
 		return -errno;
 
 	res = pwrite(fd, buf, size, offset);
@@ -339,6 +354,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 		res = -errno;
 
 	close(fd);
+	do_crypt(rpath, rpath, 1, ENC_DATA->passcode);
 	return res;
 }
 
@@ -367,6 +383,7 @@ static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi) 
 	return -errno;
 
     close(res);
+    do_crypt(rpath, rpath, 1, ENC_DATA->passcode);
 
     return 0;
 }
@@ -479,8 +496,11 @@ int main(int argc, char *argv[])
 	umask(0);
 	struct enc_state *enc_data;
 	enc_data = malloc(sizeof(struct enc_state));
-	enc_data->rootdir=argv[argc-1];
-	argv[argc-1] = NULL;
+	enc_data->rootdir=argv[argc-2];
+	argv[argc-2] = argv[argc-1];
+	argc--;
+	enc_data->passcode=argv[argc-3];
+	argv[argc-3]=argv[argc-2];
 	argc--;
 	return fuse_main(argc, argv, &xmp_oper, enc_data);
 }
